@@ -40,7 +40,7 @@ export function OptimisticTodoList() {
       // Return context with the previous value
       return { previousTodos };
     },
-    onError: (err, todoId, context) => {
+    onError: (_err, todoId, context) => {
       addLog(`❌ Error occurred! Rolling back todo ${todoId}`);
       
       // Rollback to the previous value
@@ -49,7 +49,7 @@ export function OptimisticTodoList() {
         addLog(`↩️ Rollback complete`);
       }
     },
-    onSuccess: (data, todoId) => {
+    onSuccess: (_data, todoId) => {
       addLog(`✔️ Server confirmed update for todo ${todoId}`);
     },
     onSettled: () => {
@@ -116,7 +116,7 @@ export function OptimisticTodoList() {
                 type="checkbox"
                 className="todo-checkbox"
                 checked={todo.completed}
-                onChange={() => {}}
+                readOnly
                 onClick={(e) => e.stopPropagation()}
               />
               <span className="todo-title">{todo.title}</span>

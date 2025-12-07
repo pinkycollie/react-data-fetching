@@ -92,7 +92,7 @@ export function Controls({ onFetch, onInvalidate, onExternalFetch }: ControlsPro
         <select
           id="strategy"
           value={strategy}
-          onChange={(e) => setStrategy(e.target.value as any)}
+          onChange={(e) => setStrategy(e.target.value as 'manual' | 'mount' | 'swr' | 'poll')}
         >
           <option value="manual">Manual</option>
           <option value="mount">Fetch on Mount</option>
