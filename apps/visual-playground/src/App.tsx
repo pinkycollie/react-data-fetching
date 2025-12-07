@@ -28,8 +28,6 @@ function App() {
       <div className="app-layout">
         <aside className="sidebar">
           <Controls
-            onLatencyChange={() => {}}
-            onFailureRateChange={() => {}}
             onPollingIntervalChange={setPollingInterval}
             onEndpointChange={setSelectedEndpoint}
             pollingInterval={pollingInterval}

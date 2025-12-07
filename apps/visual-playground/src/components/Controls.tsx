@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { mockApiSettings } from '../api/mockApi';
 
 export interface ControlsProps {
-  onLatencyChange: (latency: number) => void;
-  onFailureRateChange: (rate: number) => void;
   onPollingIntervalChange: (interval: number) => void;
   onEndpointChange: (endpoint: string) => void;
   pollingInterval: number;
@@ -11,8 +9,6 @@ export interface ControlsProps {
 }
 
 export default function Controls({
-  onLatencyChange,
-  onFailureRateChange,
   onPollingIntervalChange,
   onEndpointChange,
   pollingInterval,
@@ -32,13 +28,11 @@ export default function Controls({
   const handleLatencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value);
     setLatency(value);
-    onLatencyChange(value);
   };
 
   const handleFailureRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
     setFailureRate(value);
-    onFailureRateChange(value);
   };
 
   const handlePollingChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
