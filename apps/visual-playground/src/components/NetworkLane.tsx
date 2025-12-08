@@ -1,76 +1,43 @@
-import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { mockApi } from '../api/mockApi';
+import { useEffect, useState } from 'react';
 
-export interface NetworkEvent {
-  id: string;
-  type: 'request' | 'response' | 'error';
-  timestamp: number;
-  endpoint: string;
-  duration?: number;
-}
-
-interface NetworkLaneProps {
-  events: NetworkEvent[];
-}
-
-export default function NetworkLane({ events }: NetworkLaneProps) {
-  const [visibleEvents, setVisibleEvents] = useState<NetworkEvent[]>([]);
+export function NetworkLane() {
+  const [logs, setLogs] = useState(mockApi.requestLog);
 
   useEffect(() => {
-    // Keep only recent events (last 10)
-    setVisibleEvents(events.slice(-10));
-  }, [events]);
+    const interval = setInterval(() => {
+      setLogs([...mockApi.requestLog]);
+    }, 100);
 
-  const getEventIcon = (type: string) => {
-    switch (type) {
-      case 'request':
-        return '➡️';
-      case 'response':
-        return '✅';
-      case 'error':
-        return '❌';
-      default:
-        return '•';
-    }
-  };
+    return () => clearInterval(interval);
+  }, []);
 
-  const getEventColor = (type: string) => {
-    switch (type) {
-      case 'request':
-        return 'blue';
-      case 'response':
-        return 'green';
-      case 'error':
-        return 'red';
-      default:
-        return 'gray';
-    }
-  };
+  // Keep only recent logs (last 10 seconds)
+  const recentLogs = logs.filter((log) => Date.now() - log.timestamp < 10000);
 
   return (
     <div className="network-lane">
-      <h3>🌐 Network Activity</h3>
-      <div className="network-events">
-        {visibleEvents.length === 0 ? (
-          <div className="network-empty">No network activity yet</div>
-        ) : (
-          visibleEvents.map((event, index) => (
-            <div
-              key={`${event.id}-${index}`}
-              className={`network-event ${event.type}`}
-              style={{ borderLeftColor: getEventColor(event.type) }}
+      <h3>Network Activity</h3>
+      <div className="network-tokens">
+        <AnimatePresence>
+          {recentLogs.map((log, index) => (
+            <motion.div
+              key={`${log.timestamp}-${index}`}
+              className={`network-token token-${log.status}`}
+              initial={{ opacity: 0, scale: 0.8, x: -20 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.8, x: 20 }}
+              transition={{ duration: 0.3 }}
             >
-              <span className="network-icon">{getEventIcon(event.type)}</span>
-              <div className="network-info">
-                <div className="network-endpoint">{event.endpoint}</div>
-                <div className="network-meta">
-                  {new Date(event.timestamp).toLocaleTimeString()}
-                  {event.duration && (
-                    <span className="network-duration"> • {event.duration}ms</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
+              {log.url} - {log.status}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        {recentLogs.length === 0 && (
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            No recent network activity
+          </div>
         )}
       </div>
     </div>

@@ -1,7 +1,10 @@
+import http from './http';
+
 export interface Todo {
   id: number;
   title: string;
   completed: boolean;
+  userId: number;
 }
 
 export interface Post {
@@ -11,122 +14,154 @@ export interface Post {
   userId: number;
 }
 
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-  username: string;
+export interface MockApiConfig {
+  latency: number; // milliseconds
+  failureRate: number; // 0-1
+  useExternal: boolean;
+  pollInterval: number; // milliseconds
 }
 
-// Simulated data store
-let todosStore: Todo[] = [
-  { id: 1, title: 'Learn React Query', completed: false },
-  { id: 2, title: 'Build visual demo', completed: false },
-  { id: 3, title: 'Master optimistic updates', completed: false },
-  { id: 4, title: 'Understand caching strategies', completed: false },
-];
+class MockApiClass {
+  private config: MockApiConfig = {
+    latency: 500,
+    failureRate: 0,
+    useExternal: false,
+    pollInterval: 0,
+  };
 
-let postsStore: Post[] = [
-  { id: 1, title: 'Getting Started with React Query', body: 'React Query is a powerful data fetching library...', userId: 1 },
-  { id: 2, title: 'Understanding Caching', body: 'Caching is crucial for performance...', userId: 1 },
-  { id: 3, title: 'SWR vs React Query', body: 'Both libraries offer similar features...', userId: 2 },
-];
+  private mockTodos: Todo[] = [
+    { id: 1, title: 'Learn React Query', completed: false, userId: 1 },
+    { id: 2, title: 'Build a demo app', completed: false, userId: 1 },
+    { id: 3, title: 'Master data fetching', completed: true, userId: 1 },
+  ];
 
-let usersStore: User[] = [
-  { id: 1, name: 'John Doe', email: 'john@example.com', username: 'johndoe' },
-  { id: 2, name: 'Jane Smith', email: 'jane@example.com', username: 'janesmith' },
-];
+  private mockPosts: Post[] = [
+    { id: 1, title: 'First Post', body: 'This is the first post content', userId: 1 },
+    { id: 2, title: 'Second Post', body: 'This is the second post content', userId: 1 },
+    { id: 3, title: 'Third Post', body: 'This is the third post content', userId: 1 },
+  ];
 
-// Global settings for simulation
-let globalLatency = 500;
-let globalFailureRate = 0;
+  public requestLog: Array<{ timestamp: number; url: string; status: 'pending' | 'success' | 'error'; data?: any }> = [];
 
-export const mockApiSettings = {
-  setLatency: (ms: number) => {
-    globalLatency = ms;
-  },
-  setFailureRate: (rate: number) => {
-    globalFailureRate = rate;
-  },
-  getLatency: () => globalLatency,
-  getFailureRate: () => globalFailureRate,
-};
-
-// Simulate network delay and potential failure
-const simulateNetwork = async (): Promise<void> => {
-  await new Promise(resolve => setTimeout(resolve, globalLatency));
-  
-  if (Math.random() < globalFailureRate) {
-    throw new Error('Simulated network error');
+  setConfig(newConfig: Partial<MockApiConfig>) {
+    this.config = { ...this.config, ...newConfig };
   }
-};
 
-// Mock API functions
-export const mockApi = {
-  // Todos
-  getTodos: async (): Promise<Todo[]> => {
-    await simulateNetwork();
-    return [...todosStore];
-  },
-  
-  getTodo: async (id: number): Promise<Todo> => {
-    await simulateNetwork();
-    const todo = todosStore.find(t => t.id === id);
-    if (!todo) throw new Error('Todo not found');
-    return { ...todo };
-  },
-  
-  toggleTodo: async (id: number): Promise<Todo> => {
-    await simulateNetwork();
-    const index = todosStore.findIndex(t => t.id === id);
-    if (index === -1) throw new Error('Todo not found');
+  getConfig(): MockApiConfig {
+    return { ...this.config };
+  }
+
+  private async delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private shouldFail(): boolean {
+    return Math.random() < this.config.failureRate;
+  }
+
+  private logRequest(url: string, status: 'pending' | 'success' | 'error', data?: any) {
+    this.requestLog.push({
+      timestamp: Date.now(),
+      url,
+      status,
+      data,
+    });
+    // Keep only last 50 logs
+    if (this.requestLog.length > 50) {
+      this.requestLog.shift();
+    }
+  }
+
+  async getTodos(): Promise<Todo[]> {
+    const url = '/api/todos';
+    this.logRequest(url, 'pending');
     
-    todosStore[index] = {
-      ...todosStore[index],
-      completed: !todosStore[index].completed,
-    };
-    return { ...todosStore[index] };
-  },
-  
-  addTodo: async (title: string): Promise<Todo> => {
-    await simulateNetwork();
-    const newTodo = {
-      id: Math.max(...todosStore.map(t => t.id), 0) + 1,
-      title,
-      completed: false,
-    };
-    todosStore.push(newTodo);
-    return { ...newTodo };
-  },
-  
-  deleteTodo: async (id: number): Promise<void> => {
-    await simulateNetwork();
-    todosStore = todosStore.filter(t => t.id !== id);
-  },
-  
-  // Posts
-  getPosts: async (): Promise<Post[]> => {
-    await simulateNetwork();
-    return [...postsStore];
-  },
-  
-  getPost: async (id: number): Promise<Post> => {
-    await simulateNetwork();
-    const post = postsStore.find(p => p.id === id);
-    if (!post) throw new Error('Post not found');
-    return { ...post };
-  },
-  
-  // Users
-  getUsers: async (): Promise<User[]> => {
-    await simulateNetwork();
-    return [...usersStore];
-  },
-  
-  getUser: async (id: number): Promise<User> => {
-    await simulateNetwork();
-    const user = usersStore.find(u => u.id === id);
-    if (!user) throw new Error('User not found');
-    return { ...user };
-  },
-};
+    try {
+      await this.delay(this.config.latency);
+      
+      if (this.shouldFail()) {
+        this.logRequest(url, 'error');
+        throw new Error('Simulated API error');
+      }
+
+      let todos: Todo[];
+      if (this.config.useExternal) {
+        const response = await http.get<Todo[]>('https://jsonplaceholder.typicode.com/todos?_limit=10');
+        todos = response.data;
+      } else {
+        todos = this.mockTodos;
+      }
+
+      this.logRequest(url, 'success', todos);
+      return todos;
+    } catch (error) {
+      this.logRequest(url, 'error');
+      throw error;
+    }
+  }
+
+  async getPosts(): Promise<Post[]> {
+    const url = '/api/posts';
+    this.logRequest(url, 'pending');
+    
+    try {
+      await this.delay(this.config.latency);
+      
+      if (this.shouldFail()) {
+        this.logRequest(url, 'error');
+        throw new Error('Simulated API error');
+      }
+
+      let posts: Post[];
+      if (this.config.useExternal) {
+        const response = await http.get<Post[]>('https://jsonplaceholder.typicode.com/posts?_limit=10');
+        posts = response.data;
+      } else {
+        posts = this.mockPosts;
+      }
+
+      this.logRequest(url, 'success', posts);
+      return posts;
+    } catch (error) {
+      this.logRequest(url, 'error');
+      throw error;
+    }
+  }
+
+  async toggleTodo(id: number): Promise<Todo> {
+    const url = `/api/todos/${id}`;
+    this.logRequest(url, 'pending');
+    
+    try {
+      await this.delay(this.config.latency);
+      
+      if (this.shouldFail()) {
+        this.logRequest(url, 'error');
+        throw new Error('Simulated API error');
+      }
+
+      const todoIndex = this.mockTodos.findIndex((t) => t.id === id);
+      if (todoIndex === -1) {
+        throw new Error('Todo not found');
+      }
+
+      this.mockTodos[todoIndex] = {
+        ...this.mockTodos[todoIndex],
+        completed: !this.mockTodos[todoIndex].completed,
+      };
+
+      const updatedTodo = this.mockTodos[todoIndex];
+      this.logRequest(url, 'success', updatedTodo);
+      return updatedTodo;
+    } catch (error) {
+      this.logRequest(url, 'error');
+      throw error;
+    }
+  }
+
+  clearLogs() {
+    this.requestLog = [];
+  }
+}
+
+export const mockApi = new MockApiClass();

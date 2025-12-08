@@ -1,111 +1,140 @@
-import { useState, useEffect } from 'react';
-import { mockApiSettings } from '../api/mockApi';
+import { useState } from 'react';
+import { mockApi } from '../api/mockApi';
 
-export interface ControlsProps {
-  onPollingIntervalChange: (interval: number) => void;
-  onEndpointChange: (endpoint: string) => void;
-  pollingInterval: number;
-  selectedEndpoint: string;
+interface ControlsProps {
+  onFetch: () => void;
+  onInvalidate: () => void;
+  onExternalFetch: () => void;
 }
 
-export default function Controls({
-  onPollingIntervalChange,
-  onEndpointChange,
-  pollingInterval,
-  selectedEndpoint,
-}: ControlsProps) {
+export function Controls({ onFetch, onInvalidate, onExternalFetch }: ControlsProps) {
   const [latency, setLatency] = useState(500);
   const [failureRate, setFailureRate] = useState(0);
+  const [pollInterval, setPollInterval] = useState(0);
+  const [useExternal, setUseExternal] = useState(false);
+  const [strategy, setStrategy] = useState<'manual' | 'mount' | 'swr' | 'poll'>('manual');
 
-  useEffect(() => {
-    mockApiSettings.setLatency(latency);
-  }, [latency]);
-
-  useEffect(() => {
-    mockApiSettings.setFailureRate(failureRate);
-  }, [failureRate]);
-
-  const handleLatencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value);
+  const handleLatencyChange = (value: number) => {
     setLatency(value);
+    mockApi.setConfig({ latency: value });
   };
 
-  const handleFailureRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
+  const handleFailureRateChange = (value: number) => {
     setFailureRate(value);
+    mockApi.setConfig({ failureRate: value });
   };
 
-  const handlePollingChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = parseInt(e.target.value);
-    onPollingIntervalChange(value);
+  const handlePollIntervalChange = (value: number) => {
+    setPollInterval(value);
+    mockApi.setConfig({ pollInterval: value });
+  };
+
+  const handleUseExternalChange = (checked: boolean) => {
+    setUseExternal(checked);
+    mockApi.setConfig({ useExternal: checked });
+  };
+
+  const handleClearLogs = () => {
+    mockApi.clearLogs();
   };
 
   return (
     <div className="controls">
-      <h2>🎮 Control Panel</h2>
-      
+      <h2>Controls</h2>
+
       <div className="control-group">
-        <label>
-          Network Latency: {latency}ms
+        <label htmlFor="latency">
+          Latency: <span className="value-display">{latency}ms</span>
+        </label>
+        <input
+          id="latency"
+          type="range"
+          min="0"
+          max="3000"
+          step="100"
+          value={latency}
+          onChange={(e) => handleLatencyChange(Number(e.target.value))}
+        />
+      </div>
+
+      <div className="control-group">
+        <label htmlFor="failureRate">
+          Failure Rate: <span className="value-display">{(failureRate * 100).toFixed(0)}%</span>
+        </label>
+        <input
+          id="failureRate"
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          value={failureRate}
+          onChange={(e) => handleFailureRateChange(Number(e.target.value))}
+        />
+      </div>
+
+      <div className="control-group">
+        <label htmlFor="pollInterval">
+          Poll Interval: <span className="value-display">{pollInterval}ms</span>
+        </label>
+        <input
+          id="pollInterval"
+          type="range"
+          min="0"
+          max="10000"
+          step="1000"
+          value={pollInterval}
+          onChange={(e) => handlePollIntervalChange(Number(e.target.value))}
+        />
+      </div>
+
+      <div className="control-group">
+        <label htmlFor="strategy">Strategy:</label>
+        <select
+          id="strategy"
+          value={strategy}
+          onChange={(e) => setStrategy(e.target.value as 'manual' | 'mount' | 'swr' | 'poll')}
+        >
+          <option value="manual">Manual</option>
+          <option value="mount">Fetch on Mount</option>
+          <option value="swr">Stale-While-Revalidate</option>
+          <option value="poll">Polling</option>
+        </select>
+      </div>
+
+      <div className="control-group">
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <input
-            type="range"
-            min="0"
-            max="3000"
-            step="100"
-            value={latency}
-            onChange={handleLatencyChange}
+            type="checkbox"
+            checked={useExternal}
+            onChange={(e) => handleUseExternalChange(e.target.checked)}
           />
+          Use JSONPlaceholder API
         </label>
       </div>
 
-      <div className="control-group">
-        <label>
-          Failure Rate: {(failureRate * 100).toFixed(0)}%
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={failureRate}
-            onChange={handleFailureRateChange}
-          />
-        </label>
+      <div className="button-group">
+        <button className="btn btn-primary" onClick={onFetch}>
+          Fetch Data
+        </button>
+        <button className="btn btn-secondary" onClick={onInvalidate}>
+          Invalidate Cache
+        </button>
+        <button className="btn btn-secondary" onClick={onExternalFetch}>
+          Trigger External Fetch
+        </button>
+        <button className="btn btn-danger" onClick={handleClearLogs}>
+          Clear Logs
+        </button>
       </div>
 
-      <div className="control-group">
-        <label>
-          Polling Interval:
-          <select value={pollingInterval} onChange={handlePollingChange}>
-            <option value={0}>Disabled</option>
-            <option value={2000}>2 seconds</option>
-            <option value={5000}>5 seconds</option>
-            <option value={10000}>10 seconds</option>
-          </select>
-        </label>
-      </div>
-
-      <div className="control-group">
-        <label>
-          Data Source:
-          <select value={selectedEndpoint} onChange={(e) => onEndpointChange(e.target.value)}>
-            <option value="mock-todos">Mock API - Todos</option>
-            <option value="mock-posts">Mock API - Posts</option>
-            <option value="mock-users">Mock API - Users</option>
-            <option value="jsonplaceholder-todos">JSONPlaceholder - Todos</option>
-            <option value="jsonplaceholder-posts">JSONPlaceholder - Posts</option>
-            <option value="jsonplaceholder-users">JSONPlaceholder - Users</option>
-          </select>
-        </label>
-      </div>
-
-      <div className="control-info">
-        <p>💡 <strong>Tips:</strong></p>
-        <ul>
-          <li>Adjust latency to simulate slow networks</li>
-          <li>Increase failure rate to test error handling</li>
-          <li>Enable polling to see automatic refetching</li>
-          <li>Switch between mock and real APIs</li>
-        </ul>
+      <div className="control-group" style={{ marginTop: '1.5rem' }}>
+        <label>Strategy Info:</label>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+          {strategy === 'manual' && 'Click "Fetch Data" to load data manually'}
+          {strategy === 'mount' && 'Data fetches automatically on component mount'}
+          {strategy === 'swr' && 'Data refetches on window focus (staleTime: 5s)'}
+          {strategy === 'poll' && `Data polls every ${pollInterval}ms (if > 0)`}
+        </div>
       </div>
     </div>
   );

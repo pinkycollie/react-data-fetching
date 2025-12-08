@@ -1,80 +1,87 @@
 import { useState } from 'react';
-import Controls from './components/Controls';
-import Canvas from './components/Canvas';
-import CacheView from './components/CacheView';
-import NetworkLane from './components/NetworkLane';
-import QueryDemo from './components/QueryDemo';
-import OptimisticTodoList from './components/OptimisticTodoList';
-import type { NetworkEvent } from './components/NetworkLane';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { Controls } from './components/Controls';
+import { Canvas } from './components/Canvas';
+import { QueryDemo } from './components/QueryDemo';
+import { OptimisticTodoList } from './components/OptimisticTodoList';
+import './styles.css';
 
-function App() {
-  const [pollingInterval, setPollingInterval] = useState(0);
-  const [selectedEndpoint, setSelectedEndpoint] = useState('mock-todos');
-  const [networkEvents, setNetworkEvents] = useState<NetworkEvent[]>([]);
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
-  const handleNetworkEvent = (event: NetworkEvent) => {
-    setNetworkEvents((prev) => [...prev, event]);
+function AppContent() {
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const queryClient = useQueryClient();
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const handleFetch = () => {
+    queryClient.invalidateQueries({ queryKey: ['posts'] });
+  };
+
+  const handleInvalidate = () => {
+    queryClient.invalidateQueries();
+  };
+
+  const handleExternalFetch = () => {
+    queryClient.refetchQueries();
   };
 
   return (
-    <div className="app">
+    <div className="app-container" data-theme={theme}>
       <header className="app-header">
-        <h1>🎨 Visual React Query Playground</h1>
-        <p className="app-subtitle">
-          Interactive demo of React Query caching, SWR flows, polling, and optimistic updates
-        </p>
+        <h1>🚀 React Query Visual Playground</h1>
+        <button className="theme-toggle" onClick={toggleTheme}>
+          {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+        </button>
       </header>
 
-      <div className="app-layout">
-        <aside className="sidebar">
-          <Controls
-            onPollingIntervalChange={setPollingInterval}
-            onEndpointChange={setSelectedEndpoint}
-            pollingInterval={pollingInterval}
-            selectedEndpoint={selectedEndpoint}
-          />
-        </aside>
+      <div className="main-content">
+        <Controls
+          onFetch={handleFetch}
+          onInvalidate={handleInvalidate}
+          onExternalFetch={handleExternalFetch}
+        />
 
-        <main className="main-content">
-          <Canvas>
+        <Canvas>
+          <div className="demo-section">
+            <h2>📊 useQuery Demo</h2>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+              Demonstrates React Query's useQuery hook with configurable options. Watch how data is fetched,
+              cached, and managed with different strategies.
+            </p>
             <QueryDemo
-              endpoint={selectedEndpoint}
-              pollingInterval={pollingInterval}
-              onNetworkEvent={handleNetworkEvent}
+              staleTime={5000}
+              refetchOnWindowFocus={true}
+              enabled={true}
             />
-            <OptimisticTodoList onNetworkEvent={handleNetworkEvent} />
-          </Canvas>
-        </main>
+          </div>
 
-        <aside className="sidebar-right">
-          <CacheView />
-          <NetworkLane events={networkEvents} />
-        </aside>
+          <div className="demo-section">
+            <h2>✅ Optimistic Updates Demo</h2>
+            <OptimisticTodoList />
+          </div>
+        </Canvas>
       </div>
-
-      <footer className="app-footer">
-        <p>
-          Built with React Query v5 • Vite • TypeScript
-        </p>
-        <p className="footer-links">
-          <a
-            href="https://tanstack.com/query/latest"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            React Query Docs
-          </a>
-          {' | '}
-          <a
-            href="https://github.com/pinkycollie/react-data-fetching"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub
-          </a>
-        </p>
-      </footer>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

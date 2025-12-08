@@ -1,88 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { mockApi, type Todo } from '../api/mockApi';
-import type { NetworkEvent } from './NetworkLane';
+import { mockApi, Todo } from '../api/mockApi';
+import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 
-interface OptimisticTodoListProps {
-  onNetworkEvent: (event: NetworkEvent) => void;
-}
-
-export default function OptimisticTodoList({ onNetworkEvent }: OptimisticTodoListProps) {
+export function OptimisticTodoList() {
   const queryClient = useQueryClient();
+  const [logs, setLogs] = useState<string[]>([]);
 
-  // Fetch todos
-  const { data: todos, isLoading } = useQuery({
+  const addLog = (message: string) => {
+    setLogs((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${message}`].slice(-10));
+  };
+
+  const { data: todos, isLoading, isError, error } = useQuery<Todo[]>({
     queryKey: ['todos'],
-    queryFn: async () => {
-      const requestId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      const startTime = Date.now();
-
-      onNetworkEvent({
-        id: requestId,
-        type: 'request',
-        timestamp: startTime,
-        endpoint: 'todos',
-      });
-
-      try {
-        const data = await mockApi.getTodos();
-        const duration = Date.now() - startTime;
-        onNetworkEvent({
-          id: requestId,
-          type: 'response',
-          timestamp: Date.now(),
-          endpoint: 'todos',
-          duration,
-        });
-        return data;
-      } catch (error) {
-        onNetworkEvent({
-          id: requestId,
-          type: 'error',
-          timestamp: Date.now(),
-          endpoint: 'todos',
-        });
-        throw error;
-      }
-    },
+    queryFn: () => mockApi.getTodos(),
   });
 
-  // Toggle todo mutation with optimistic update
-  const toggleMutation = useMutation({
-    mutationFn: async (todoId: number) => {
-      const requestId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      const startTime = Date.now();
-
-      onNetworkEvent({
-        id: requestId,
-        type: 'request',
-        timestamp: startTime,
-        endpoint: `toggle-todo-${todoId}`,
-      });
-
-      try {
-        const data = await mockApi.toggleTodo(todoId);
-        const duration = Date.now() - startTime;
-        onNetworkEvent({
-          id: requestId,
-          type: 'response',
-          timestamp: Date.now(),
-          endpoint: `toggle-todo-${todoId}`,
-          duration,
-        });
-        return data;
-      } catch (error) {
-        onNetworkEvent({
-          id: requestId,
-          type: 'error',
-          timestamp: Date.now(),
-          endpoint: `toggle-todo-${todoId}`,
-        });
-        throw error;
-      }
-    },
-    // Optimistic update
+  const mutation = useMutation({
+    mutationFn: (todoId: number) => mockApi.toggleTodo(todoId),
     onMutate: async (todoId) => {
-      // Cancel any outgoing refetches
+      addLog(`🔄 Optimistically updating todo ${todoId}`);
+      
+      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['todos'] });
 
       // Snapshot the previous value
@@ -92,87 +31,124 @@ export default function OptimisticTodoList({ onNetworkEvent }: OptimisticTodoLis
       queryClient.setQueryData<Todo[]>(['todos'], (old) => {
         if (!old) return old;
         return old.map((todo) =>
-          todo.id === todoId
-            ? { ...todo, completed: !todo.completed }
-            : todo
+          todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
         );
       });
+
+      addLog(`✅ Cache updated optimistically`);
 
       // Return context with the previous value
       return { previousTodos };
     },
-    // On error, roll back to the previous value
-    onError: (err, _todoId, context) => {
+    onError: (_err, todoId, context) => {
+      addLog(`❌ Error occurred! Rolling back todo ${todoId}`);
+      
+      // Rollback to the previous value
       if (context?.previousTodos) {
         queryClient.setQueryData(['todos'], context.previousTodos);
+        addLog(`↩️ Rollback complete`);
       }
-      console.error('Failed to toggle todo:', err);
     },
-    // Always refetch after error or success
+    onSuccess: (_data, todoId) => {
+      addLog(`✔️ Server confirmed update for todo ${todoId}`);
+    },
     onSettled: () => {
+      // Always refetch after error or success to sync with server
       queryClient.invalidateQueries({ queryKey: ['todos'] });
     },
   });
 
   const handleToggle = (todoId: number) => {
-    toggleMutation.mutate(todoId);
+    mutation.mutate(todoId);
   };
 
-  return (
-    <div className="optimistic-todo-list">
-      <h3>✅ Optimistic Updates Demo</h3>
-      
-      <div className="todo-info">
-        <p>
-          Click on any todo to toggle its status. The UI updates immediately
-          (optimistic update) and reverts if the server request fails.
-        </p>
-      </div>
+  useEffect(() => {
+    if (todos) {
+      addLog(`📦 Todos loaded: ${todos.length} items`);
+    }
+  }, [todos]);
 
-      {isLoading ? (
-        <div className="loading">Loading todos...</div>
-      ) : (
-        <div className="todos">
-          {todos?.map((todo) => (
-            <div
+  return (
+    <div>
+      <h3>Todo List with Optimistic Updates</h3>
+      <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+        Click on a todo to toggle its completion status. The UI updates immediately (optimistic update),
+        then the server request is made. If it fails, the change is rolled back.
+      </p>
+
+      {isLoading && (
+        <div className="loading-state">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            Loading todos...
+          </motion.div>
+        </div>
+      )}
+
+      {isError && (
+        <motion.div
+          className="error-state"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          Error: {error instanceof Error ? error.message : 'Unknown error'}
+        </motion.div>
+      )}
+
+      {todos && (
+        <motion.div
+          className="todo-list"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          {todos.map((todo) => (
+            <motion.div
               key={todo.id}
-              className={`todo-item ${todo.completed ? 'completed' : ''} ${
-                toggleMutation.isPending ? 'updating' : ''
-              }`}
+              className={`todo-item ${todo.completed ? 'completed' : ''}`}
               onClick={() => handleToggle(todo.id)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              layout
             >
               <input
                 type="checkbox"
-                checked={todo.completed}
-                onChange={() => {}}
                 className="todo-checkbox"
+                checked={todo.completed}
+                readOnly
+                onClick={(e) => e.stopPropagation()}
               />
               <span className="todo-title">{todo.title}</span>
-              {toggleMutation.isPending && (
-                <span className="todo-status">⏳</span>
+              {mutation.isPending && mutation.variables === todo.id && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--accent-warning)' }}>
+                  ⏳ Updating...
+                </span>
               )}
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
 
-      {toggleMutation.isError && (
-        <div className="error-message">
-          ❌ Failed to toggle todo. The change has been reverted.
-        </div>
-      )}
-
-      <div className="optimistic-explainer">
-        <h4>How it works:</h4>
-        <ol>
-          <li>✅ UI updates immediately when you click (optimistic)</li>
-          <li>📡 Request sent to server in the background</li>
-          <li>
-            {toggleMutation.isError
-              ? '❌ Server responded with error → UI rolled back'
-              : '✅ Server confirms → UI stays updated'}
-          </li>
-        </ol>
+      <div className="logs-container">
+        <h3>Activity Logs</h3>
+        {logs.length === 0 ? (
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            No activity yet
+          </div>
+        ) : (
+          logs.map((log, index) => (
+            <motion.div
+              key={index}
+              className="log-entry"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {log}
+            </motion.div>
+          ))
+        )}
       </div>
     </div>
   );

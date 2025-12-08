@@ -1,15 +1,17 @@
 import { ReactNode } from 'react';
+import { NetworkLane } from './NetworkLane';
+import { CacheView } from './CacheView';
 
 interface CanvasProps {
   children: ReactNode;
 }
 
-export default function Canvas({ children }: CanvasProps) {
+export function Canvas({ children }: CanvasProps) {
   return (
     <div className="canvas">
-      <div className="canvas-content">
-        {children}
-      </div>
+      <NetworkLane />
+      {children}
+      <CacheView />
     </div>
   );
 }

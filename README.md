@@ -4,6 +4,7 @@ This repository demonstrates the four main data-fetching strategies in modern Re
 
 - [0-json-server](./apps/0-json-server) - backend server for the apps - `pnpm serve`
 - **[visual-playground](./apps/visual-playground)** - 🎨 Interactive visual demo of React Query caching, SWR flows, polling, and optimistic updates - [http://localhost:3350/](http://localhost:3350/)
+- **[visual-playground](./apps/visual-playground)** - 🚀 Interactive React Query visualization demo - `npm run dev` [http://localhost:3350/](http://localhost:3350/)
 
 ## Table of Contents
 

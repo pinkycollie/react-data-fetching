@@ -1,163 +1,123 @@
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { mockApi } from '../api/mockApi';
-import apiClient from '../api/http';
-import type { NetworkEvent } from './NetworkLane';
+import { useQuery } from '@tanstack/react-query';
+import { mockApi, Post } from '../api/mockApi';
+import { motion } from 'framer-motion';
 
 interface QueryDemoProps {
-  endpoint: string;
-  pollingInterval: number;
-  onNetworkEvent: (event: NetworkEvent) => void;
+  staleTime?: number;
+  refetchOnWindowFocus?: boolean;
+  refetchInterval?: number;
+  enabled?: boolean;
 }
 
-export default function QueryDemo({
-  endpoint,
-  pollingInterval,
-  onNetworkEvent,
+export function QueryDemo({
+  staleTime = 0,
+  refetchOnWindowFocus = false,
+  refetchInterval,
+  enabled = true,
 }: QueryDemoProps) {
-  const queryClient = useQueryClient();
-  const [staleTime, setStaleTime] = useState(0);
-  const [refetchOnWindowFocus, setRefetchOnWindowFocus] = useState(false);
-
-  const fetchData = async () => {
-    const requestId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
-    const startTime = Date.now();
-
-    onNetworkEvent({
-      id: requestId,
-      type: 'request',
-      timestamp: startTime,
-      endpoint: endpoint,
-    });
-
-    try {
-      let data;
-      
-      if (endpoint.startsWith('mock-')) {
-        const type = endpoint.split('-')[1];
-        switch (type) {
-          case 'todos':
-            data = await mockApi.getTodos();
-            break;
-          case 'posts':
-            data = await mockApi.getPosts();
-            break;
-          case 'users':
-            data = await mockApi.getUsers();
-            break;
-          default:
-            throw new Error('Unknown endpoint');
-        }
-      } else {
-        // JSONPlaceholder endpoints
-        const type = endpoint.split('-')[1];
-        const response = await apiClient.get(
-          `https://jsonplaceholder.typicode.com/${type}`
-        );
-        data = response.data;
-      }
-
-      const duration = Date.now() - startTime;
-      onNetworkEvent({
-        id: requestId,
-        type: 'response',
-        timestamp: Date.now(),
-        endpoint: endpoint,
-        duration,
-      });
-
-      return data;
-    } catch (error) {
-      onNetworkEvent({
-        id: requestId,
-        type: 'error',
-        timestamp: Date.now(),
-        endpoint: endpoint,
-      });
-      throw error;
-    }
-  };
-
-  const { data, isLoading, isError, error, isFetching, dataUpdatedAt } = useQuery({
-    queryKey: ['data', endpoint],
-    queryFn: fetchData,
-    staleTime: staleTime,
-    refetchOnWindowFocus: refetchOnWindowFocus,
-    refetchInterval: pollingInterval > 0 ? pollingInterval : false,
+  const { data, isLoading, isError, error, isFetching, dataUpdatedAt, refetch } = useQuery<Post[]>({
+    queryKey: ['posts'],
+    queryFn: () => mockApi.getPosts(),
+    staleTime,
+    refetchOnWindowFocus,
+    refetchInterval,
+    enabled,
   });
 
-  const handleManualRefetch = () => {
-    queryClient.invalidateQueries({ queryKey: ['data', endpoint] });
-  };
-
   return (
-    <div className="query-demo">
-      <h3>🔍 Query Demo</h3>
-      
-      <div className="query-controls">
-        <div className="query-control">
-          <label>
-            Stale Time:
-            <select
-              value={staleTime}
-              onChange={(e) => setStaleTime(parseInt(e.target.value))}
-            >
-              <option value={0}>0ms (always stale)</option>
-              <option value={5000}>5 seconds</option>
-              <option value={10000}>10 seconds</option>
-              <option value={30000}>30 seconds</option>
-              <option value={Infinity}>Infinity (never stale)</option>
-            </select>
-          </label>
+    <div>
+      <div className="query-info">
+        <div className="query-info-item">
+          <span className="query-info-label">Status:</span>
+          <span className="query-info-value">
+            {isLoading ? 'Loading' : isError ? 'Error' : 'Success'}
+          </span>
         </div>
-
-        <div className="query-control">
-          <label>
-            <input
-              type="checkbox"
-              checked={refetchOnWindowFocus}
-              onChange={(e) => setRefetchOnWindowFocus(e.target.checked)}
-            />
-            Refetch on window focus
-          </label>
+        <div className="query-info-item">
+          <span className="query-info-label">Fetching:</span>
+          <span className="query-info-value">{isFetching ? 'Yes' : 'No'}</span>
         </div>
+        <div className="query-info-item">
+          <span className="query-info-label">Last Updated:</span>
+          <span className="query-info-value">
+            {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : 'Never'}
+          </span>
+        </div>
+        <div className="query-info-item">
+          <span className="query-info-label">Stale Time:</span>
+          <span className="query-info-value">{staleTime}ms</span>
+        </div>
+        <div className="query-info-item">
+          <span className="query-info-label">Refetch on Focus:</span>
+          <span className="query-info-value">{refetchOnWindowFocus ? 'Yes' : 'No'}</span>
+        </div>
+        {refetchInterval && (
+          <div className="query-info-item">
+            <span className="query-info-label">Refetch Interval:</span>
+            <span className="query-info-value">{refetchInterval}ms</span>
+          </div>
+        )}
+      </div>
 
-        <button onClick={handleManualRefetch} className="refetch-button">
-          🔄 Manual Refetch
+      <div style={{ marginTop: '1rem' }}>
+        <button className="btn btn-primary" onClick={() => refetch()} style={{ marginBottom: '1rem' }}>
+          Manual Refetch
         </button>
       </div>
 
-      <div className="query-status">
-        <div className="status-badge">
-          {isLoading && <span className="badge loading">⏳ Loading</span>}
-          {isFetching && !isLoading && <span className="badge fetching">🔄 Refetching</span>}
-          {isError && <span className="badge error">❌ Error</span>}
-          {!isLoading && !isError && !isFetching && (
-            <span className="badge success">✅ Success</span>
-          )}
+      {isLoading && (
+        <div className="loading-state">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            Loading posts...
+          </motion.div>
         </div>
-        {dataUpdatedAt > 0 && (
-          <div className="status-time">
-            Last updated: {new Date(dataUpdatedAt).toLocaleTimeString()}
-          </div>
-        )}
-      </div>
+      )}
 
-      <div className="query-data">
-        {isError && (
-          <div className="error-message">
-            Error: {error instanceof Error ? error.message : 'Unknown error'}
-          </div>
-        )}
-        {data && (
-          <div className="data-preview">
-            <div className="data-count">
-              {Array.isArray(data) ? `${data.length} items` : 'Object'}
+      {isError && (
+        <motion.div
+          className="error-state"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          Error: {error instanceof Error ? error.message : 'Unknown error'}
+        </motion.div>
+      )}
+
+      {data && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          style={{ marginTop: '1rem' }}
+        >
+          <h3>Posts ({data.length}):</h3>
+          {data.slice(0, 5).map((post) => (
+            <motion.div
+              key={post.id}
+              className="cache-entry"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)', marginBottom: '0.25rem' }}>
+                {post.title}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                {post.body.substring(0, 100)}...
+              </div>
+            </motion.div>
+          ))}
+          {data.length > 5 && (
+            <div style={{ marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+              And {data.length - 5} more...
             </div>
-            <pre>{JSON.stringify(data, null, 2).slice(0, 500)}...</pre>
-          </div>
-        )}
-      </div>
+          )}
+        </motion.div>
+      )}
     </div>
   );
 }
