@@ -15,7 +15,7 @@
     "@tabler/icons-react": "3.17.0",
     "@tanstack/react-query": "^5.85.0",
     "mantine-react-table": "^2.0.0-beta.6",
-    "next": "15.4.6",
+    "next": "16.1.4",
     "react": "^19",
     "react-dom": "^19"
   },
