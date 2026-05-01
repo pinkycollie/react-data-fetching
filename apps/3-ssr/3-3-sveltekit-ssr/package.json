@@ -14,7 +14,7 @@
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^4.0.0",
-		"@sveltejs/kit": "^2.17.2",
+		"@sveltejs/kit": "^2.57.1",
 		"@sveltejs/vite-plugin-svelte": "^5.0.3",
 		"@tanstack/svelte-query": "^5.66.4",
 		"@tanstack/svelte-query-devtools": "^5.66.4",
